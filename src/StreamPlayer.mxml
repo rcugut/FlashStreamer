@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   creationComplete="application1_creationCompleteHandler(event)"
+			   >
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.events.TextOperationEvent;
+			
+			protected var _nc:NetConnection;
+			protected var _ns:NetStream = null;
+			protected var _vd:Video;
+			protected var _urlStreaming:String;
+			protected var _streamName:String = 'myStream';
+			
+			[Bindable]
+			protected var _videoWidth:int = 640;
+			[Bindable]
+			protected var _videoHeight:int = 480; 
+			
+			
+			
+			protected function application1_creationCompleteHandler(event:FlexEvent):void
+			{
+				_urlStreaming = 'rtmp://'+ input_streamingServerIp.text +'/live';
+				
+				_nc = new NetConnection();
+				_nc.client = this;
+				_nc.addEventListener(NetStatusEvent.NET_STATUS, onNetStatusEvent);
+				
+				_vd = new Video();
+				_vd.width = uic_video.width;
+				_vd.height = uic_video.height;
+				_vd.x = 0;
+				_vd.y = 0;
+//				_vd.smoothing = true;
+				uic_video.addChild(_vd);
+			}
+			
+			
+			
+			
+			private function onNetStatusEvent(event:NetStatusEvent):void
+			{
+				debug_label.text = ("NetStatusEvent: " + event.info.code + ' Desc:' + event.info.description);
+				
+				switch(event.info.code)
+				{
+					case 'NetConnection.Connect.Success':
+						debug_label.text = "connection OK: " + _urlStreaming + ' @ ' + _streamName;
+						
+						_ns = new NetStream(_nc);
+						_ns.client = new Object();
+//						_ns.bufferTime = 0;
+						_ns.play(_streamName);
+						_vd.attachNetStream(_ns);
+						break;
+					
+					
+					case 'NetConnection.Connect.Failed':
+					case 'NetConnection.Connect.Closed':
+						break;
+				}//switch
+			}
+			
+			
+			public function onMetaData(o:Object):void	
+			{
+				label_metaText.text = "Meta: ";
+				for (var settings:String in o)
+				{
+//					trace(settings + " = " + o[settings]);
+					label_metaText.text += settings.toUpperCase() + " = " + o[settings] + " | ";
+				}
+			}
+			
+			public function onBWDone():void
+			{
+			}
+			
+			
+			
+			protected function btnConnect_clickHandler(event:MouseEvent):void
+			{
+				debug_label.text = 'connecting...';
+				_urlStreaming = 'rtmp://'+ input_streamingServerIp.text +'/live';
+				_streamName = input_streamName.text;
+				_nc.connect(_urlStreaming);
+			}
+			
+			
+			
+			protected function textinput1_changeHandler(event:TextOperationEvent):void
+			{
+				input_videoHeight.text = (parseInt(input_videoWidth.text) * 0.75).toString();
+			}
+			
+			
+			protected function btnApply_clickHandler(event:MouseEvent):void
+			{
+				_videoWidth = parseInt(input_videoWidth.text);
+				_videoHeight = parseInt(input_videoHeight.text);
+				_vd.width = _videoWidth;
+				_vd.height = _videoHeight;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	
+	<s:HGroup top="2" left="0" verticalAlign="middle">
+		<s:Label text="rtmp://" />
+		<s:TextInput id="input_streamingServerIp" text="localhost" width="200" />
+		<s:Label text="/live @ " />
+		<s:TextInput id="input_streamName" text="myStream" width="90" />
+		<s:Button label="Connect &amp; play" click="btnConnect_clickHandler(event)" />
+		<s:Spacer width="30" />
+		<s:Label text="Video res:" />
+		<s:TextInput id="input_videoWidth" width="60" text="640" change="textinput1_changeHandler(event)" />
+		<s:Label text="X"/>
+		<s:TextInput id="input_videoHeight" width="60" text="{_videoHeight}" />
+		<s:Button label="Apply" click="btnApply_clickHandler(event)(event)" />
+	</s:HGroup>
+
+	<s:Label id="debug_label" text="" top="26" left="0" right="0" height="22" backgroundAlpha="0.5" backgroundColor="#cccccc" />
+	<s:Label id="label_metaText" text="" top="50" left="0" right="0" height="22" backgroundAlpha="0.5" backgroundColor="#eeffee" />
+
+	
+	
+	
+	
+	<mx:UIComponent id="uic_video" left="0" top="90" width="{_videoWidth}" height="{_videoHeight}">
+	</mx:UIComponent>
+	
+	<s:Rect left="0" top="90" width="{_videoWidth}" height="{_videoHeight}">
+		<s:stroke>
+			<s:SolidColorStroke color="#666666" />
+		</s:stroke>
+	</s:Rect>
+	
+	
+	
+</s:Application>

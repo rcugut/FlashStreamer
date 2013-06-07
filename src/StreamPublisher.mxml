@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   creationComplete="application1_creationCompleteHandler(event)"
+			   >
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import spark.events.TextOperationEvent;
+			protected var _urlStreaming:String;
+			protected var _streamName:String = 'myStream';
+			
+			[Bindable]
+			protected var _videoQuality:int = 90;
+			[Bindable]
+			protected var _videoFps:int = 20;
+			[Bindable]
+			protected var _videoWidth:int = 640;
+			[Bindable]
+			protected var _videoHeight:int = 480;
+
+			
+			private var _nc:NetConnection;
+			private var _nsOut:NetStream;
+			private var ns_in:NetStream;
+			private var _cam:Camera;
+			private var _vd:Video;
+			private var vid_in:Video;
+			
+			
+			
+			protected function application1_creationCompleteHandler(event:FlexEvent):void
+			{
+				_urlStreaming = 'rtmp://'+ input_streamingServerIp.text +'/live';
+
+				_nc = new NetConnection();
+				_nc.client = this;	
+				_nc.addEventListener(NetStatusEvent.NET_STATUS, onNetStatus);
+
+				_cam = Camera.getCamera();
+				_videoWidth = _cam.width;
+				_videoHeight = _cam.height;
+
+				_vd = new Video(); 
+				_vd.x = 0; 
+				_vd.y = 0;
+				_vd.width = _videoWidth;
+				_vd.height = _videoHeight;
+				_vd.attachCamera(_cam); 
+				uic_video.addChild(_vd); 
+			}
+			
+			
+			
+			
+			protected function btnConnect_clickHandler(event:MouseEvent):void
+			{
+				label_debug.text = 'connecting...';
+				_urlStreaming = 'rtmp://'+ input_streamingServerIp.text +'/live';
+				_streamName = input_streamName.text;
+				_nc.connect(_urlStreaming);
+			}
+			
+			
+			
+			
+			protected function onNetStatus(event:NetStatusEvent):void
+			{ 
+				label_debug.text = ("NetStatusEvent: " + event.info.code + ' Desc:' + event.info.description);
+				
+				switch(event.info.code)
+				{
+					case 'NetConnection.Connect.Success':
+						label_debug.text = "connection OK: " + _urlStreaming + ' @ ' + _streamName;
+						publishCamera(); 
+						break;
+					
+					
+					case 'NetConnection.Connect.Failed':
+					case 'NetConnection.Connect.Closed':
+						break;
+				}//switch
+			}
+			
+			
+			
+			
+			protected function publishCamera():void
+			{  
+				_nsOut = new NetStream(_nc); 
+				_nsOut.attachCamera(_cam);  
+				
+				var h264Settings:H264VideoStreamSettings = new H264VideoStreamSettings();
+				h264Settings.setProfileLevel(H264Profile.BASELINE, H264Level.LEVEL_3_1);
+				
+				//  ALTHOUGH FUTURE VERSIONS OF FLASH PLAYER SHOULD SUPPORT SETTING ENCODING PARAMETERS
+				//  ON h264Settings BY USING THE setQuality() and setMode() METHODS, FOR NOW YOU MUST SET 
+				//  SET THE PARAMETERS ON THE CAMERA FOR: BANDWITH, QUALITY, HEIGHT, WIDTH, AND FRAMES PER SECOND.
+				
+				//	h264Settings.setQuality(30000, 90); 
+				//	h264Settings.setMode(320, 240, 30);
+				
+				_cam.setQuality(0, _videoQuality);
+				_cam.setMode(_videoWidth, _videoHeight, _videoFps, true);
+				_cam.setKeyFrameInterval(15);
+				_nsOut.videoStreamSettings = h264Settings;
+				//		trace(ns_out.videoStreamSettings.codec + ", " + h264Settings.profile + ", " + h264Settings.level);
+				_nsOut.publish(_streamName, "live");
+				
+				var metaData:Object = new Object();
+				metaData.codec = _nsOut.videoStreamSettings.codec;
+				metaData.profile =  h264Settings.profile;
+				metaData.level = h264Settings.level;
+				metaData.fps = _cam.fps;
+				metaData.bandwith = _cam.bandwidth;
+				metaData.height = _cam.height;
+				metaData.width = _cam.width;
+				metaData.keyFrameInterval = _cam.keyFrameInterval;
+				metaData.copyright = "copyright";
+				_nsOut.send("@setDataFrame", "onMetaData", metaData);
+			}
+			
+			
+			
+
+			
+			
+			
+			protected function textinput1_changeHandler(event:TextOperationEvent):void
+			{
+				input_videoHeight.text = (parseInt(input_videoWidth.text) * 0.75).toString();
+			}
+
+			protected function btnApply_clickHandler(event:MouseEvent):void
+			{
+				_videoWidth = parseInt(input_videoWidth.text);
+				_videoHeight = parseInt(input_videoHeight.text);
+				_videoFps = parseInt(input_videoFps.text);
+				_cam.setMode(_videoWidth, _videoHeight, _videoFps);
+				_vd.width = _videoWidth;
+				_vd.height = _videoHeight;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:HGroup top="2" left="0" verticalAlign="middle">
+		<s:Label text="rtmp://" />
+		<s:TextInput id="input_streamingServerIp" text="localhost" width="200" />
+		<s:Label text="/live @ " />
+		<s:TextInput id="input_streamName" text="myStream" width="90" />
+		<s:Button label="Publish (h264)" click="btnConnect_clickHandler(event)" />
+		<s:Spacer width="30" />
+		<s:Label text="Video res:" />
+		<s:TextInput id="input_videoWidth" width="60" text="{_videoWidth}" change="textinput1_changeHandler(event)" />
+		<s:Label text="X"/>
+		<s:TextInput id="input_videoHeight" width="60" text="{_videoHeight}" />
+		<s:Label text="@"/>
+		<s:TextInput id="input_videoFps" width="60" text="{_videoFps}" />
+		<s:Label text="fps"/>
+		<s:Button label="Apply" click="btnApply_clickHandler(event)(event)" />
+	</s:HGroup>
+	<s:Label id="label_debug" text="" top="26" left="0" right="0" height="22" backgroundAlpha="0.5" backgroundColor="#cccccc" />
+	
+	<mx:UIComponent id="uic_video" left="0" top="50" width="{_videoWidth}" height="{_videoHeight}">
+	</mx:UIComponent>
+
+	<s:Rect left="0" top="50" width="{_videoWidth}" height="{_videoHeight}">
+		<s:stroke>
+			<s:SolidColorStroke color="#666666" />
+		</s:stroke>
+	</s:Rect>
+	
+
+	
+</s:Application>
